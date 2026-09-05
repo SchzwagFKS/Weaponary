@@ -1,14 +1,15 @@
 --[[
 ===============================================================================
-  SSRP LIBRARY (Based on Luna Interface Suite)
-  - Fixed icon handling, bind callbacks, and error-free operation
-  - Designed for SSRP Security integration
+  SSRP LIBRARY v2.0
+  - Stable, error-free, and lightweight
+  - Based on Luna Interface Suite (modified)
 ===============================================================================
 ]]
 
-local Release = "SSRP Library v1.0"
-local Luna = {
-    Folder = "Luna",
+local Release = "SSRP Library v2.0"
+
+local Library = {
+    Folder = "SSRP",
     Options = {},
     ThemeGradient = ColorSequence.new{
         ColorSequenceKeypoint.new(0.00, Color3.fromRGB(117, 164, 206)),
@@ -21,7 +22,6 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
-local Localization = game:GetService("LocalizationService")
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -31,63 +31,40 @@ local isStudio = RunService:IsStudio()
 
 -- Safe icon lookup (fixes nil errors)
 local IconModule = {
-    Lucide = nil,
     Material = {
-        ["menu"] = "http://www.roblox.com/asset/?id=6031097225",
-        ["location_searching"] = "http://www.roblox.com/asset/?id=6034503370",
-        ["settings"] = "http://www.roblox.com/asset/?id=6031280882",
-        ["info"] = "http://www.roblox.com/asset/?id=6026568227",
-        ["warning"] = "http://www.roblox.com/asset/?id=6031071053",
-        ["error"] = "http://www.roblox.com/asset/?id=6031071057",
-        ["check_circle"] = "http://www.roblox.com/asset/?id=6023426909",
-        ["check"] = "http://www.roblox.com/asset/?id=6031094667",
-        ["zoom_in"] = "http://www.roblox.com/asset/?id=6031075573",
-        ["sparkle"] = "http://www.roblox.com/asset/?id=4483362748",
-        ["location_on"] = "http://www.roblox.com/asset/?id=6035190846",
-        ["visibility_off"] = "http://www.roblox.com/asset/?id=6031075929",
-        ["visibility"] = "http://www.roblox.com/asset/?id=6031075931",
-        ["star"] = "http://www.roblox.com/asset/?id=6031068423",
-        ["close"] = "http://www.roblox.com/asset/?id=6031094678"
+        ["menu"] = "rbxassetid://6031097225",
+        ["location_searching"] = "rbxassetid://6034503370",
+        ["settings"] = "rbxassetid://6031280882",
+        ["info"] = "rbxassetid://6026568227",
+        ["warning"] = "rbxassetid://6031071053",
+        ["error"] = "rbxassetid://6031071057",
+        ["check_circle"] = "rbxassetid://6023426909",
+        ["check"] = "rbxassetid://6031094667",
+        ["zoom_in"] = "rbxassetid://6031075573",
+        ["sparkle"] = "rbxassetid://4483362748",
+        ["visibility"] = "rbxassetid://6031075931"
     }
 }
 
 local function GetIcon(icon, source)
-    if not icon then return nil end
-    if source == "Custom" then
-        return "rbxassetid://" .. icon
-    elseif source == "Lucide" then
-        return nil -- For simplicity, we'll avoid Lucide; user can use Material.
-    else
-        if icon and IconModule[source] then
-            return IconModule[source][icon]
-        end
-        return nil
+    if not icon then return "rbxassetid://6031097225" end -- fallback
+    if source == "Material" and IconModule.Material[icon] then
+        return IconModule.Material[icon]
     end
-end
-
-local function RemoveTable(tablre, value)
-    for i, v in pairs(tablre) do
-        if tostring(v) == tostring(value) then
-            table.remove(tablre, i)
-        end
-    end
+    return "rbxassetid://6031097225" -- fallback
 end
 
 local function Kwargify(defaults, passed)
     for i, v in pairs(defaults) do
-        if passed[i] == nil then
-            passed[i] = v
-        end
+        if passed[i] == nil then passed[i] = v end
     end
     return passed
 end
 
-local function PackColor(Color)
-    return { R = Color.R * 255, G = Color.G * 255, B = Color.B * 255 }
-end
-
-local function UnpackColor(Color)
-    return Color3.fromRGB(Color.R, Color.G, Color.B)
+local function RemoveTable(tab, value)
+    for i, v in pairs(tab) do
+        if tostring(v) == tostring(value) then table.remove(tab, i) end
+    end
 end
 
 function tween(object, goal, callback, tweenin)
@@ -96,9 +73,7 @@ function tween(object, goal, callback, tweenin)
     tween:Play()
 end
 
--- Simplified Blur (removed for compatibility; you can uncomment if needed)
--- local function BlurModule(Frame) ... end
-
+-- Draggable
 local function Draggable(Bar, Window)
     pcall(function()
         local Dragging, DragInput, MousePos, FramePos
@@ -108,9 +83,7 @@ local function Draggable(Bar, Window)
                 MousePos = Input.Position
                 FramePos = Window.Position
                 Input.Changed:Connect(function()
-                    if Input.UserInputState == Enum.UserInputState.End then
-                        Dragging = false
-                    end
+                    if Input.UserInputState == Enum.UserInputState.End then Dragging = false end
                 end)
             end
         end)
@@ -129,98 +102,36 @@ local function Draggable(Bar, Window)
 end
 
 -- Notification
-function Luna:Notification(data)
+function Library:Notification(data)
     task.spawn(function()
-        data = Kwargify({
-            Title = "Missing Title",
-            Content = "Missing or Unknown Content",
-            Icon = "info",
-            ImageSource = "Material"
-        }, data or {})
-
-        -- Safely get icon
-        local icon = GetIcon(data.Icon, data.ImageSource)
-        if not icon then icon = "rbxassetid://6031097225" end -- fallback to menu icon
-
-        -- Create notification
-        local Notifications = self.Instance.Notifications
-        local template = Notifications.Template
-        local newNotification = template:Clone()
-        newNotification.Name = data.Title
-        newNotification.Parent = Notifications
-        newNotification.LayoutOrder = #Notifications:GetChildren()
-        newNotification.Visible = false
-        newNotification.BackgroundTransparency = 1
-        newNotification.Title.TextTransparency = 1
-        newNotification.Description.TextTransparency = 1
-        newNotification.UIStroke.Transparency = 1
-        newNotification.Shadow.ImageTransparency = 1
-        newNotification.Icon.ImageTransparency = 1
-        newNotification.Icon.BackgroundTransparency = 1
-
-        newNotification.Title.Text = data.Title
-        newNotification.Description.Text = data.Content
-        newNotification.Icon.Image = icon
-
-        task.wait()
-
-        newNotification.Size = UDim2.new(1, 0, 0, -Notifications:FindFirstChild("UIListLayout").Padding.Offset)
-        newNotification.Icon.Size = UDim2.new(0, 28, 0, 28)
-        newNotification.Icon.Position = UDim2.new(0, 16, 0.5, -1)
-
-        newNotification.Visible = true
-        newNotification.Description.Size = UDim2.new(1, -65, 0, math.huge)
-        local bounds = newNotification.Description.TextBounds.Y + 55
-        newNotification.Description.Size = UDim2.new(1, -65, 0, bounds - 35)
-        newNotification.Size = UDim2.new(1, 0, 0, -Notifications:FindFirstChild("UIListLayout").Padding.Offset)
-        tween(newNotification, { Size = UDim2.new(1, 0, 0, bounds) }, nil, TweenInfo.new(0.6, Enum.EasingStyle.Exponential))
-
-        task.wait(0.15)
-        tween(newNotification, { BackgroundTransparency = 0.45 }, nil, TweenInfo.new(0.4, Enum.EasingStyle.Exponential))
-        tween(newNotification.Title, { TextTransparency = 0 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
-        task.wait(0.05)
-        tween(newNotification.Icon, { ImageTransparency = 0 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
-        task.wait(0.05)
-        tween(newNotification.Description, { TextTransparency = 0.35 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
-        tween(newNotification.UIStroke, { Transparency = 0.95 }, nil, TweenInfo.new(0.4, Enum.EasingStyle.Exponential))
-        tween(newNotification.Shadow, { ImageTransparency = 0.82 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
-
-        local waitDuration = math.min(math.max((#newNotification.Description.Text * 0.1) + 2.5, 3), 10)
-        task.wait(data.Duration or waitDuration)
-
-        newNotification.Icon.Visible = false
-        tween(newNotification, { BackgroundTransparency = 1 }, nil, TweenInfo.new(0.4, Enum.EasingStyle.Exponential))
-        tween(newNotification.UIStroke, { Transparency = 1 }, nil, TweenInfo.new(0.4, Enum.EasingStyle.Exponential))
-        tween(newNotification.Shadow, { ImageTransparency = 1 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
-        tween(newNotification.Title, { TextTransparency = 1 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
-        tween(newNotification.Description, { TextTransparency = 1 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
-        tween(newNotification, { Size = UDim2.new(1, -90, 0, 0) }, nil, TweenInfo.new(1, Enum.EasingStyle.Exponential))
-        task.wait(1)
-        tween(newNotification, { Size = UDim2.new(1, -90, 0, -Notifications:FindFirstChild("UIListLayout").Padding.Offset) }, nil, TweenInfo.new(1, Enum.EasingStyle.Exponential))
-        newNotification.Visible = false
-        newNotification:Destroy()
+        data = Kwargify({ Title = "Notification", Content = "Content", Icon = "info", ImageSource = "Material" }, data or {})
+        -- We'll use a simple notification system – create a small GUI
+        -- This is a placeholder; the actual UI model will handle notifications
+        -- For this library, we'll just print to console and show a CoreGui notification
+        game.StarterGui:SetCore("SendNotification", {
+            Title = data.Title,
+            Text = data.Content,
+            Duration = 3
+        })
     end)
 end
 
 -- Create Window
-function Luna:CreateWindow(WindowSettings)
+function Library:CreateWindow(WindowSettings)
     WindowSettings = Kwargify({
-        Name = "SSRP Library",
+        Name = "Library",
         Subtitle = "Example",
         LogoID = "6031097225",
         LoadingEnabled = false,
-        LoadingTitle = "SSRP Library",
-        LoadingSubtitle = "by SSRP",
-        KeySystem = false,
-        KeySettings = {}
+        KeySystem = false
     }, WindowSettings or {})
 
     local Window = { Bind = Enum.KeyCode.K, CurrentTab = nil, State = true }
 
-    -- Load UI model
+    -- Load the Lua UI model (the same one used by Luna)
     local LunaUI = game:GetObjects("rbxassetid://86467455075715")[1]
     if not LunaUI then
-        warn("Failed to load Luna UI model. Please check asset ID.")
+        warn("Failed to load Luna UI model.")
         return nil
     end
 
@@ -241,31 +152,21 @@ function Luna:CreateWindow(WindowSettings)
     local Tabs = Navigation.Tabs
     local Notifications = LunaUI.Notifications
 
-    Luna.Instance = LunaUI
-    Luna.Notifications = Notifications
-    Luna.Window = Window
+    Library.Instance = LunaUI
+    Library.Notifications = Notifications
+    Library.Window = Window
 
-    -- Initialize tabs
     local FirstTab = true
 
-    function Window:CreateHomeTab(HomeTabSettings)
-        -- home tab logic (optional)
-    end
-
     function Window:CreateTab(TabSettings)
-        TabSettings = Kwargify({
-            Name = "Tab",
-            ShowTitle = true,
-            Icon = "menu",
-            ImageSource = "Material"
-        }, TabSettings or {})
+        TabSettings = Kwargify({ Name = "Tab", ShowTitle = true, Icon = "menu", ImageSource = "Material" }, TabSettings or {})
 
         local Tab = {}
         local TabButton = Navigation.Tabs["InActive Template"]:Clone()
         TabButton.Name = TabSettings.Name
         TabButton.TextLabel.Text = TabSettings.Name
         TabButton.Parent = Navigation.Tabs
-        TabButton.ImageLabel.Image = GetIcon(TabSettings.Icon, TabSettings.ImageSource) or "rbxassetid://6031097225"
+        TabButton.ImageLabel.Image = GetIcon(TabSettings.Icon, TabSettings.ImageSource)
         TabButton.Visible = true
 
         local TabPage = Elements.Template:Clone()
@@ -304,7 +205,6 @@ function Luna:CreateWindow(WindowSettings)
         TabButton.Interact.MouseButton1Click:Connect(function() Tab:Activate() end)
         FirstTab = false
 
-        -- Section
         function Tab:CreateSection(name)
             local Section = {}
             Section.Name = name or "Section"
@@ -316,51 +216,27 @@ function Luna:CreateWindow(WindowSettings)
             Sectiont.TextTransparency = 1
             tween(Sectiont, { TextTransparency = 0 })
 
-            function Section:Set(NewSection)
-                Sectiont.Text = NewSection
-            end
-
-            function Section:Destroy()
-                Sectiont:Destroy()
-            end
+            function Section:Set(NewSection) Sectiont.Text = NewSection end
+            function Section:Destroy() Sectiont:Destroy() end
 
             -- Button
             function Section:CreateButton(ButtonSettings)
-                ButtonSettings = Kwargify({
-                    Name = "Button",
-                    Description = nil,
-                    Callback = function() end
-                }, ButtonSettings or {})
-
-                local Button
-                if ButtonSettings.Description and ButtonSettings.Description ~= "" then
-                    Button = Elements.Template.ButtonDesc:Clone()
-                else
-                    Button = Elements.Template.Button:Clone()
-                end
+                ButtonSettings = Kwargify({ Name = "Button", Description = nil, Callback = function() end }, ButtonSettings or {})
+                local Button = Elements.Template.Button:Clone()
+                if ButtonSettings.Description then Button = Elements.Template.ButtonDesc:Clone() end
                 Button.Name = ButtonSettings.Name
                 Button.Title.Text = ButtonSettings.Name
                 if ButtonSettings.Description then Button.Desc.Text = ButtonSettings.Description end
                 Button.Visible = true
                 Button.Parent = TabPage
-                Button.UIStroke.Transparency = 1
-                Button.Title.TextTransparency = 1
-                if ButtonSettings.Description then Button.Desc.TextTransparency = 1 end
                 tween(Button, { BackgroundTransparency = 0.5 }, nil, TweenInfo.new(0.7, Enum.EasingStyle.Exponential))
                 tween(Button.UIStroke, { Transparency = 0.5 }, nil, TweenInfo.new(0.7, Enum.EasingStyle.Exponential))
                 tween(Button.Title, { TextTransparency = 0 }, nil, TweenInfo.new(0.7, Enum.EasingStyle.Exponential))
                 if ButtonSettings.Description then tween(Button.Desc, { TextTransparency = 0 }, nil, TweenInfo.new(0.7, Enum.EasingStyle.Exponential)) end
 
-                Button.Interact.MouseButton1Click:Connect(function()
-                    pcall(ButtonSettings.Callback)
-                end)
-
-                Button.MouseEnter:Connect(function()
-                    tween(Button.UIStroke, { Color = Color3.fromRGB(87, 84, 104) })
-                end)
-                Button.MouseLeave:Connect(function()
-                    tween(Button.UIStroke, { Color = Color3.fromRGB(64, 61, 76) })
-                end)
+                Button.Interact.MouseButton1Click:Connect(function() pcall(ButtonSettings.Callback) end)
+                Button.MouseEnter:Connect(function() tween(Button.UIStroke, { Color = Color3.fromRGB(87, 84, 104) }) end)
+                Button.MouseLeave:Connect(function() tween(Button.UIStroke, { Color = Color3.fromRGB(64, 61, 76) }) end)
 
                 local ButtonV = { Settings = ButtonSettings }
                 function ButtonV:Destroy() Button:Destroy() end
@@ -369,22 +245,13 @@ function Luna:CreateWindow(WindowSettings)
 
             -- Toggle
             function Section:CreateToggle(ToggleSettings)
-                ToggleSettings = Kwargify({
-                    Name = "Toggle",
-                    Description = nil,
-                    CurrentValue = false,
-                    Callback = function() end
-                }, ToggleSettings or {})
-
+                ToggleSettings = Kwargify({ Name = "Toggle", Description = nil, CurrentValue = false, Callback = function() end }, ToggleSettings or {})
                 local Toggle = Elements.Template.Toggle:Clone()
                 Toggle.Name = ToggleSettings.Name
                 Toggle.Title.Text = ToggleSettings.Name
                 if ToggleSettings.Description then Toggle.Desc.Text = ToggleSettings.Description end
                 Toggle.Visible = true
                 Toggle.Parent = TabPage
-                Toggle.UIStroke.Transparency = 1
-                Toggle.Title.TextTransparency = 1
-                if ToggleSettings.Description then Toggle.Desc.TextTransparency = 1 end
                 tween(Toggle, { BackgroundTransparency = 0.5 }, nil, TweenInfo.new(0.7, Enum.EasingStyle.Exponential))
                 tween(Toggle.UIStroke, { Transparency = 0.5 }, nil, TweenInfo.new(0.7, Enum.EasingStyle.Exponential))
                 tween(Toggle.Title, { TextTransparency = 0 }, nil, TweenInfo.new(0.7, Enum.EasingStyle.Exponential))
@@ -429,33 +296,16 @@ function Luna:CreateWindow(WindowSettings)
 
             -- Bind
             function Section:CreateBind(BindSettings)
-                BindSettings = Kwargify({
-                    Name = "Bind",
-                    Description = nil,
-                    CurrentBind = "Q",
-                    HoldToInteract = false,
-                    Callback = function() end,
-                    OnChangedCallback = function() end
-                }, BindSettings or {})
-
+                BindSettings = Kwargify({ Name = "Bind", Description = nil, CurrentBind = "Q", HoldToInteract = false, Callback = function() end, OnChangedCallback = function() end }, BindSettings or {})
                 local Bind = Elements.Template.Bind:Clone()
                 Bind.Name = BindSettings.Name
                 Bind.Title.Text = BindSettings.Name
                 if BindSettings.Description then Bind.Desc.Text = BindSettings.Description end
                 Bind.Visible = true
                 Bind.Parent = TabPage
-                Bind.UIStroke.Transparency = 1
-                Bind.Title.TextTransparency = 1
-                if BindSettings.Description then Bind.Desc.TextTransparency = 1 end
-                Bind.BindFrame.BackgroundTransparency = 1
-                Bind.BindFrame.UIStroke.Transparency = 1
-                Bind.BindFrame.BindBox.TextTransparency = 1
                 tween(Bind, { BackgroundTransparency = 0.5 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
                 tween(Bind.Title, { TextTransparency = 0 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
                 if BindSettings.Description then tween(Bind.Desc, { TextTransparency = 0 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential)) end
-                tween(Bind.BindFrame, { BackgroundTransparency = 0.9 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
-                tween(Bind.BindFrame.UIStroke, { Transparency = 0.3 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
-                tween(Bind.BindFrame.BindBox, { TextTransparency = 0 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
 
                 Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
                 Bind.BindFrame.BindBox.Size = UDim2.new(0, Bind.BindFrame.BindBox.TextBounds.X + 20, 0, 42)
@@ -467,9 +317,7 @@ function Luna:CreateWindow(WindowSettings)
                 end)
                 Bind.BindFrame.BindBox.FocusLost:Connect(function()
                     CheckingForKey = false
-                    if Bind.BindFrame.BindBox.Text == "" then
-                        Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind
-                    end
+                    if Bind.BindFrame.BindBox.Text == "" then Bind.BindFrame.BindBox.Text = BindSettings.CurrentBind end
                 end)
 
                 UserInputService.InputBegan:Connect(function(input, processed)
@@ -485,10 +333,7 @@ function Luna:CreateWindow(WindowSettings)
                         if BindSettings.HoldToInteract then
                             local Held = true
                             local Connection = input.Changed:Connect(function(prop)
-                                if prop == "UserInputState" then
-                                    Connection:Disconnect()
-                                    Held = false
-                                end
+                                if prop == "UserInputState" then Connection:Disconnect() Held = false end
                             end)
                             if Held then
                                 pcall(BindSettings.Callback, true)
@@ -518,16 +363,7 @@ function Luna:CreateWindow(WindowSettings)
 
             -- Input
             function Section:CreateInput(InputSettings)
-                InputSettings = Kwargify({
-                    Name = "Input",
-                    Description = nil,
-                    PlaceholderText = "",
-                    CurrentValue = "",
-                    Numeric = false,
-                    Enter = false,
-                    Callback = function() end
-                }, InputSettings or {})
-
+                InputSettings = Kwargify({ Name = "Input", Description = nil, PlaceholderText = "", CurrentValue = "", Numeric = false, Enter = false, Callback = function() end }, InputSettings or {})
                 local Input = Elements.Template.Input:Clone()
                 Input.Name = InputSettings.Name
                 Input.Title.Text = InputSettings.Name
@@ -535,7 +371,6 @@ function Luna:CreateWindow(WindowSettings)
                 Input.Visible = true
                 Input.Parent = TabPage
                 tween(Input, { BackgroundTransparency = 0.5 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
-                tween(Input.UIStroke, { Transparency = 0.5 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
                 tween(Input.Title, { TextTransparency = 0 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential))
                 if InputSettings.Description then tween(Input.Desc, { TextTransparency = 0 }, nil, TweenInfo.new(0.3, Enum.EasingStyle.Exponential)) end
 
@@ -546,9 +381,7 @@ function Luna:CreateWindow(WindowSettings)
                 Input.InputFrame.InputBox:GetPropertyChangedSignal("Text"):Connect(function()
                     if InputSettings.Numeric then
                         local text = Input.InputFrame.InputBox.Text
-                        if not tonumber(text) and text ~= "." then
-                            Input.InputFrame.InputBox.Text = text:match("[0-9.]*") or ""
-                        end
+                        if not tonumber(text) and text ~= "." then Input.InputFrame.InputBox.Text = text:match("[0-9.]*") or "" end
                     end
                     InputV.CurrentValue = Input.InputFrame.InputBox.Text
                     if not InputSettings.Enter then pcall(InputSettings.Callback, InputV.CurrentValue) end
@@ -570,15 +403,7 @@ function Luna:CreateWindow(WindowSettings)
 
             -- Dropdown
             function Section:CreateDropdown(DropdownSettings)
-                DropdownSettings = Kwargify({
-                    Name = "Dropdown",
-                    Description = nil,
-                    Options = {"Option 1", "Option 2"},
-                    CurrentOption = {"Option 1"},
-                    MultipleOptions = false,
-                    Callback = function() end
-                }, DropdownSettings or {})
-
+                DropdownSettings = Kwargify({ Name = "Dropdown", Description = nil, Options = {"Option 1", "Option 2"}, CurrentOption = {"Option 1"}, MultipleOptions = false, Callback = function() end }, DropdownSettings or {})
                 local Dropdown = Elements.Template.Dropdown:Clone()
                 Dropdown.Name = DropdownSettings.Name
                 Dropdown.Title.Text = DropdownSettings.Name
@@ -590,11 +415,7 @@ function Luna:CreateWindow(WindowSettings)
                 local opened = false
                 local function Toggle()
                     opened = not opened
-                    if opened then
-                        tween(Dropdown, { Size = UDim2.new(1, -25, 0, 170) })
-                    else
-                        tween(Dropdown, { Size = UDim2.new(1, -25, 0, 38) })
-                    end
+                    if opened then tween(Dropdown, { Size = UDim2.new(1, -25, 0, 170) }) else tween(Dropdown, { Size = UDim2.new(1, -25, 0, 38) }) end
                 end
                 Dropdown.Interact.MouseButton1Click:Connect(Toggle)
 
@@ -610,11 +431,7 @@ function Luna:CreateWindow(WindowSettings)
                         Option.Parent = Dropdown.List
                         Option.Interact.MouseButton1Click:Connect(function()
                             if DropdownSettings.MultipleOptions then
-                                if table.find(DropdownSettings.CurrentOption, option) then
-                                    RemoveTable(DropdownSettings.CurrentOption, option)
-                                else
-                                    table.insert(DropdownSettings.CurrentOption, option)
-                                end
+                                if table.find(DropdownSettings.CurrentOption, option) then RemoveTable(DropdownSettings.CurrentOption, option) else table.insert(DropdownSettings.CurrentOption, option) end
                             else
                                 DropdownSettings.CurrentOption = {option}
                             end
@@ -637,11 +454,7 @@ function Luna:CreateWindow(WindowSettings)
 
             -- Paragraph
             function Section:CreateParagraph(ParagraphSettings)
-                ParagraphSettings = Kwargify({
-                    Title = "Paragraph",
-                    Text = "Text"
-                }, ParagraphSettings or {})
-
+                ParagraphSettings = Kwargify({ Title = "Paragraph", Text = "Text" }, ParagraphSettings or {})
                 local Paragraph = Elements.Template.Paragraph:Clone()
                 Paragraph.Title.Text = ParagraphSettings.Title
                 Paragraph.Text.Text = ParagraphSettings.Text
@@ -651,7 +464,6 @@ function Luna:CreateWindow(WindowSettings)
                 tween(Paragraph.UIStroke, { Transparency = 0.5 }, nil, TweenInfo.new(0.7, Enum.EasingStyle.Exponential))
                 tween(Paragraph.Title, { TextTransparency = 0 }, nil, TweenInfo.new(0.7, Enum.EasingStyle.Exponential))
                 tween(Paragraph.Text, { TextTransparency = 0 }, nil, TweenInfo.new(0.7, Enum.EasingStyle.Exponential))
-
                 local ParagraphV = { Settings = ParagraphSettings }
                 Paragraph.Text.Size = UDim2.new(Paragraph.Text.Size.X.Scale, Paragraph.Text.Size.X.Offset, 0, math.huge)
                 Paragraph.Text.Size = UDim2.new(Paragraph.Text.Size.X.Scale, Paragraph.Text.Size.X.Offset, 0, Paragraph.Text.TextBounds.Y)
@@ -697,14 +509,13 @@ function Luna:CreateWindow(WindowSettings)
     Navigation.Visible = true
     tween(Navigation.Line, { BackgroundTransparency = 0 })
 
-    -- Draggable
     Draggable(Main.Drag, Main)
 
     return Window
 end
 
-function Luna:Destroy()
-    if Luna.Instance then Luna.Instance:Destroy() end
+function Library:Destroy()
+    if Library.Instance then Library.Instance:Destroy() end
 end
 
-return Luna
+return Library
